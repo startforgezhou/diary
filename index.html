@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="日记">
+<meta name="theme-color" content="#f7f5f0">
+<title>日记</title>
+<style>
+  :root{
+    --paper:#f7f5f0;
+    --ink:#1e1c19;
+    --muted:#8d867b;
+    --line:#e3ded4;
+    --accent:#8a5a3b;
+    --card:#fffdf9;
+    --maxw:720px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  body{
+    background:var(--paper);color:var(--ink);
+    font-family:"Songti SC","Noto Serif SC","Source Han Serif SC",Georgia,serif;
+    line-height:1.9;font-size:16.5px;
+    -webkit-font-smoothing:antialiased;
+    padding-bottom:calc(60px + env(safe-area-inset-bottom));
+  }
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 22px;}
+
+  header{padding:calc(38px + env(safe-area-inset-top)) 0 22px;border-bottom:1px solid var(--line);}
+  .top{display:flex;align-items:baseline;justify-content:space-between;gap:14px;flex-wrap:wrap;}
+  h1{font-size:26px;font-weight:500;letter-spacing:.18em;}
+  .stat{font-size:12.5px;color:var(--muted);letter-spacing:.08em;}
+
+  .tools{margin-top:18px;display:flex;flex-direction:column;gap:10px;}
+  .search{
+    width:100%;border:1px solid var(--line);background:var(--card);
+    border-radius:10px;padding:11px 14px;font-size:15px;outline:none;
+    font-family:inherit;color:var(--ink);
+  }
+  .search:focus{border-color:#cbbfae;}
+  .tags{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;-webkit-overflow-scrolling:touch;}
+  .tags::-webkit-scrollbar{display:none;}
+  .tag{
+    flex:0 0 auto;border:1px solid var(--line);background:var(--card);color:var(--muted);
+    border-radius:999px;padding:5px 13px;font-size:13px;font-family:inherit;cursor:pointer;
+  }
+  .tag.on{background:#efe9df;border-color:#d9cdb9;color:var(--accent);}
+
+  main{padding-top:8px;}
+  article{padding:38px 0;border-bottom:1px solid var(--line);}
+  article:last-child{border-bottom:none;}
+  .date{font-size:12.5px;color:var(--accent);letter-spacing:.16em;}
+  .date span{color:var(--muted);margin-left:8px;letter-spacing:.06em;}
+  h2{font-size:21px;font-weight:500;margin:12px 0 6px;line-height:1.5;letter-spacing:.02em;}
+  .meta{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
+  .meta .t{font-size:12px;color:var(--muted);border-bottom:1px solid var(--line);}
+  .body p{margin:0 0 1.05em;text-align:justify;}
+  .body h3{font-size:17px;font-weight:600;margin:1.4em 0 .6em;}
+  .body ul,.body ol{margin:0 0 1.1em 1.2em;}
+  .body li{margin:.3em 0;}
+  .body blockquote{
+    border-left:2px solid var(--accent);padding:.2em 0 .2em 14px;margin:1.1em 0;
+    color:#5f584e;font-style:normal;
+  }
+  .body strong{font-weight:600;}
+  .body a{color:var(--accent);text-decoration:none;border-bottom:1px solid #d9c6b7;}
+  .figs{margin-top:18px;display:flex;flex-direction:column;gap:12px;}
+  .figs img{width:100%;border-radius:8px;display:block;border:1px solid var(--line);}
+  .figs .cap{font-size:12.5px;color:var(--muted);margin-top:6px;letter-spacing:.04em;}
+
+  .empty{padding:70px 0;text-align:center;color:var(--muted);font-size:14px;}
+  footer{padding:30px 0 10px;font-size:12px;color:var(--muted);letter-spacing:.1em;text-align:center;}
+
+  .lb{position:fixed;inset:0;background:rgba(20,18,16,.94);display:none;align-items:center;justify-content:center;z-index:50;padding:16px;}
+  .lb.on{display:flex;}
+  .lb img{max-width:100%;max-height:100%;object-fit:contain;border-radius:4px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="top">
+      <h1>日记</h1>
+      <div class="stat" id="stat"></div>
+    </div>
+    <div class="tools">
+      <input class="search" id="q" type="search" placeholder="搜索标题或正文" autocomplete="off">
+      <div class="tags" id="tags"></div>
+    </div>
+  </header>
+
+  <main id="list"></main>
+
+  <footer>写作即整理</footer>
+</div>
+<div class="lb" id="lb"><img alt="" id="lbimg"></div>
+
+<script>
+(function(){
+  'use strict';
+  var ENTRIES = [];
+  var state = {q:'', tag:'全部'};
+
+  function esc(s){
+    return String(s==null?'':s).replace(/[&<>"']/g,function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+
+  function inline(s){
+    s = esc(s);
+    s = s.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, function(m,alt,src){
+      return '<img alt="'+alt+'" src="'+src+'" style="max-width:100%;border-radius:8px;margin:.6em 0">';
+    });
+    s = s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    return s;
+  }
+
+  function md(text){
+    var lines = String(text||'').split(/\r?\n/);
+    var out = [], buf = [], mode = null;
+
+    function flushP(){ if(buf.length){ out.push('<p>'+buf.join('<br>')+'</p>'); buf=[]; } }
+    function closeList(){ if(mode){ out.push('</'+mode+'>'); mode=null; } }
+
+    lines.forEach(function(raw){
+      var l = raw.replace(/\s+$/,'');
+      if(!l.trim()){ flushP(); closeList(); return; }
+      var m;
+      if(m = l.match(/^###\s+(.*)$/)){ flushP(); closeList(); out.push('<h3>'+inline(m[1])+'</h3>'); return; }
+      if(m = l.match(/^>\s?(.*)$/)){ flushP(); closeList(); out.push('<blockquote>'+inline(m[1])+'</blockquote>'); return; }
+      if(m = l.match(/^[-*]\s+(.*)$/)){ flushP(); if(mode!=='ul'){ closeList(); out.push('<ul>'); mode='ul'; } out.push('<li>'+inline(m[1])+'</li>'); return; }
+      if(m = l.match(/^\d+\.\s+(.*)$/)){ flushP(); if(mode!=='ol'){ closeList(); out.push('<ol>'); mode='ol'; } out.push('<li>'+inline(m[1])+'</li>'); return; }
+      closeList();
+      buf.push(inline(l));
+    });
+    flushP(); closeList();
+    return out.join('');
+  }
+
+  function fmtDate(d){
+    var p = d.split('-');
+    return p[0]+' 年 '+Number(p[1])+' 月 '+Number(p[2])+' 日';
+  }
+  function weekday(d){
+    var dt = new Date(d+'T00:00:00');
+    return ['周日','周一','周二','周三','周四','周五','周六'][dt.getDay()] || '';
+  }
+
+  function matches(e){
+    if(state.tag !== '全部'){
+      var tags = e.tags || [];
+      if(tags.indexOf(state.tag) < 0) return false;
+    }
+    if(state.q){
+      var q = state.q.toLowerCase();
+      var hay = ((e.title||'')+' '+(e.body||'')+' '+((e.tags||[]).join(' '))).toLowerCase();
+      if(hay.indexOf(q) < 0) return false;
+    }
+    return true;
+  }
+
+  function render(){
+    var list = document.getElementById('list');
+    var items = ENTRIES.filter(matches);
+    if(!items.length){
+      list.innerHTML = '<div class="empty">'+(ENTRIES.length ? '没有匹配的日记' : '还没有日记')+'</div>';
+      return;
+    }
+    list.innerHTML = items.map(function(e, i){
+      var figs = (e.images||[]).map(function(im){
+        return '<figure><img src="'+esc(im.src)+'" alt="'+esc(im.caption||'')+'" data-lb="1" loading="lazy">'+
+               (im.caption ? '<div class="cap">'+esc(im.caption)+'</div>' : '')+'</figure>';
+      }).join('');
+      var tags = (e.tags||[]).map(function(t){ return '<span class="t">#'+esc(t)+'</span>'; }).join('');
+      return '<article>'+
+        '<div class="date">'+fmtDate(e.date)+'<span>'+weekday(e.date)+'</span></div>'+
+        (e.title ? '<h2>'+esc(e.title)+'</h2>' : '')+
+        (tags ? '<div class="meta">'+tags+'</div>' : '')+
+        '<div class="body">'+md(e.body)+'</div>'+
+        (figs ? '<div class="figs">'+figs+'</div>' : '')+
+      '</article>';
+    }).join('');
+  }
+
+  function buildTags(){
+    var box = document.getElementById('tags');
+    var all = {};
+    ENTRIES.forEach(function(e){ (e.tags||[]).forEach(function(t){ all[t]=(all[t]||0)+1; }); });
+    var keys = Object.keys(all).sort(function(a,b){ return all[b]-all[a]; });
+    var html = ['<button class="tag on" data-t="全部">全部</button>'];
+    keys.forEach(function(k){ html.push('<button class="tag" data-t="'+esc(k)+'">'+esc(k)+' '+all[k]+'</button>'); });
+    box.innerHTML = html.join('');
+    box.addEventListener('click', function(ev){
+      var b = ev.target.closest('.tag'); if(!b) return;
+      state.tag = b.getAttribute('data-t');
+      Array.prototype.forEach.call(box.children, function(x){ x.classList.remove('on'); });
+      b.classList.add('on');
+      render();
+    });
+  }
+
+  function stats(){
+    var n = ENTRIES.length;
+    var days = {};
+    ENTRIES.forEach(function(e){ days[e.date]=1; });
+    document.getElementById('stat').textContent = n ? (n+' 篇 · '+Object.keys(days).length+' 天') : '';
+  }
+
+  function bind(){
+    var q = document.getElementById('q');
+    var timer;
+    q.addEventListener('input', function(){
+      clearTimeout(timer);
+      timer = setTimeout(function(){ state.q = q.value.trim(); render(); }, 180);
+    });
+    document.getElementById('list').addEventListener('click', function(ev){
+      var img = ev.target.closest('img[data-lb]'); if(!img) return;
+      document.getElementById('lbimg').src = img.src;
+      document.getElementById('lb').classList.add('on');
+    });
+    document.getElementById('lb').addEventListener('click', function(){
+      this.classList.remove('on');
+    });
+  }
+
+  fetch('data/entries.json', {cache:'no-store'})
+    .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .then(function(d){
+      ENTRIES = (d.entries||[]).slice().sort(function(a,b){ return a.date < b.date ? 1 : -1; });
+      stats(); buildTags(); render(); bind();
+    })
+    .catch(function(err){
+      document.getElementById('list').innerHTML =
+        '<div class="empty">日记数据读取失败：'+esc(err.message)+'</div>';
+    });
+})();
+</script>
+</body>
+</html>
