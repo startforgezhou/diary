@@ -169,6 +169,12 @@
       <div class="hint" id="hint"></div>
     </div>
 
+    <div class="card" id="reimburseCard" style="display:none">
+      <div class="sum-label">待报销（不计入预算）</div>
+      <div class="sum" style="font-size:26px"><small>&yen;</small><span id="reimbTotal">0</span></div>
+      <div class="hint" id="reimbHint"></div>
+    </div>
+
     <h3 class="sec">分类占比</h3>
     <div class="card" id="catStats" style="margin-top:0"></div>
 
@@ -300,9 +306,23 @@
     document.getElementById('monthLabel').textContent =
       state.ym.slice(0,4)+' 年 '+Number(state.ym.slice(5,7))+' 月';
 
-    var items = monthItems();
+    var all = monthItems();
+    var items = all.filter(function(x){ return !x.reimburse; });
+    var reimb = all.filter(function(x){ return !!x.reimburse; });
     var total = items.reduce(function(s,x){ return s + Number(x.amount||0); }, 0);
+    var reimbTotal = reimb.reduce(function(s,x){ return s + Number(x.amount||0); }, 0);
+
     document.getElementById('total').textContent = money(total);
+
+    var rc = document.getElementById('reimburseCard');
+    if(reimb.length){
+      rc.style.display = '';
+      document.getElementById('reimbTotal').textContent = money(reimbTotal);
+      document.getElementById('reimbHint').textContent =
+        reimb.length+' 笔，'+reimb.map(function(x){return x.note||x.cat;}).join('、')+'。报销到账后跟我说，我把它标成已报。';
+    }else{
+      rc.style.display = 'none';
+    }
 
     var budget = Number(EXP.budget)||0, over=false, pct=0;
     if(budget>0){
@@ -355,11 +375,11 @@
     }
 
     var list = document.getElementById('expList');
-    if(!items.length){
+    if(!all.length){
       list.innerHTML = '<div class="empty">还没有记录。跟我说「咖啡 12」，我就记上。</div>';
       return;
     }
-    var sorted = items.slice().sort(function(a,b){
+    var sorted = all.slice().sort(function(a,b){
       if(a.date===b.date) return String(b.id||'').localeCompare(String(a.id||''));
       return a.date < b.date ? 1 : -1;
     });
@@ -370,9 +390,10 @@
         var d=x.date.slice(5).split('-');
         html += '<div class="day">'+Number(d[0])+' 月 '+Number(d[1])+' 日</div>';
       }
-      html += '<div class="item"><div class="main"><div class="t">'+esc(x.cat)+'</div>'+
+      var badge = x.reimburse ? '<span style="font-size:11px;color:var(--accent);border:1px solid var(--line);border-radius:99px;padding:1px 7px;margin-left:6px">待报销</span>' : '';
+      html += '<div class="item'+(x.reimburse?' dim':'')+'"><div class="main"><div class="t">'+esc(x.cat)+badge+'</div>'+
         (x.note?'<div class="s">'+esc(x.note)+'</div>':'')+'</div>'+
-        '<div class="a">&minus;¥'+money(x.amount)+'</div></div>';
+        '<div class="a">'+(x.reimburse?'':'&minus;')+'¥'+money(x.amount)+'</div></div>';
     });
     list.innerHTML = html;
   }

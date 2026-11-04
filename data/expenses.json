@@ -27,14 +27,16 @@
       "date": "2026-11-04",
       "amount": 338,
       "cat": "日用",
-      "note": "配眼镜"
+      "note": "配眼镜",
+      "reimburse": true
     },
     {
       "id": "20261104-3",
       "date": "2026-11-04",
       "amount": 15,
       "cat": "医疗",
-      "note": "验光"
+      "note": "验光",
+      "reimburse": true
     }
   ]
 }
