@@ -27,3 +27,18 @@ git add -A && git commit -m "diary: 2026-11-02" && git push
 ```
 
 Pages 自动重新构建，约 30 秒生效。
+
+## 账本
+
+`data/expenses.json` 结构：
+
+```json
+{
+  "budget": 1500,
+  "items": [
+    { "id": "20261104-1", "date": "2026-11-04", "amount": 12, "cat": "餐饮", "note": "橙 C 美式" }
+  ]
+}
+```
+
+分类建议：餐饮 / 交通 / 画材 / 学习 / 日用 / 娱乐 / 其他
