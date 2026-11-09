@@ -125,6 +125,17 @@
   .empty{padding:44px 16px;text-align:center;color:var(--muted);font-size:14px;}
   footer{padding:30px 0 10px;font-size:12px;color:var(--muted);letter-spacing:.1em;text-align:center;}
 
+  .quote{
+    padding:26px 0;border-bottom:1px solid var(--line);
+  }
+  .quote:last-child{border-bottom:none;}
+  .quote .qd{font-size:12px;color:var(--muted);letter-spacing:.16em;margin-bottom:10px;}
+  .quote .qt{
+    font-size:clamp(17px,4.6vw,19px);line-height:2;letter-spacing:.02em;
+    text-align:justify;
+  }
+  .quote .qn{font-size:13px;color:var(--muted);margin-top:12px;letter-spacing:.04em;}
+
   .lb{position:fixed;inset:0;background:rgba(20,18,16,.94);display:none;align-items:center;justify-content:center;z-index:50;padding:16px;}
   .lb.on{display:flex;}
   .lb img{max-width:100%;max-height:100%;object-fit:contain;border-radius:4px;}
@@ -141,6 +152,7 @@
     <div class="tabs">
       <button class="tab on" data-view="diary">日记</button>
       <button class="tab" data-view="ledger">账本</button>
+      <button class="tab" data-view="quotes">加油站</button>
     </div>
   </header>
 
@@ -182,6 +194,10 @@
     <div class="list" id="expList"></div>
   </section>
 
+  <section id="view-quotes" style="display:none">
+    <div id="quoteList" style="padding-top:10px"></div>
+  </section>
+
   <footer>写作即整理</footer>
 </div>
 <div class="lb" id="lb"><img alt="" id="lbimg"></div>
@@ -191,6 +207,7 @@
   'use strict';
   var ENTRIES = [];
   var EXP = {budget:0, items:[]};
+  var QUOTES = [];
   var view = 'diary';
   var state = {q:'', tag:'全部', ym:null};
 
@@ -295,6 +312,24 @@
       b.classList.add('on');
       renderDiary();
     });
+  }
+
+  /* ---------- 加油站 ---------- */
+  function renderQuotes(){
+    var box = document.getElementById('quoteList');
+    if(!QUOTES.length){
+      box.innerHTML = '<div class="empty">还没有内容</div>';
+      return;
+    }
+    var arr = QUOTES.slice().sort(function(a,b){ return a.date < b.date ? 1 : -1; });
+    box.innerHTML = arr.map(function(q){
+      var d = q.date.split('-');
+      return '<div class="quote">'+
+        '<div class="qd">'+d[0]+' 年 '+Number(d[1])+' 月 '+Number(d[2])+' 日'+(q.tag ? ' · '+esc(q.tag) : '')+'</div>'+
+        '<div class="qt">'+esc(q.text).replace(/\n/g,'<br>')+'</div>'+
+        (q.note ? '<div class="qn">'+esc(q.note)+'</div>' : '')+
+      '</div>';
+    }).join('');
   }
 
   /* ---------- 账本 ---------- */
@@ -403,11 +438,17 @@
     view = v;
     document.getElementById('view-diary').style.display = v==='diary' ? '' : 'none';
     document.getElementById('view-ledger').style.display = v==='ledger' ? '' : 'none';
-    document.getElementById('pageTitle').textContent = v==='diary' ? '日记' : '账本';
+    document.getElementById('view-quotes').style.display = v==='quotes' ? '' : 'none';
+    document.getElementById('pageTitle').textContent =
+      v==='diary' ? '日记' : (v==='ledger' ? '账本' : '加油站');
     Array.prototype.forEach.call(document.querySelectorAll('.tab'), function(b){
       b.classList.toggle('on', b.getAttribute('data-view')===v);
     });
     var stat = document.getElementById('stat');
+    if(v==='quotes'){
+      stat.textContent = QUOTES.length ? (QUOTES.length+' 条') : '';
+      return;
+    }
     if(v==='ledger'){
       stat.textContent = EXP.items.length ? (EXP.items.length+' 笔') : '';
     }else{
@@ -451,14 +492,18 @@
 
   Promise.all([
     fetch('data/entries.json',{cache:'no-store'}).then(function(r){ return r.ok?r.json():{entries:[]}; }),
-    fetch('data/expenses.json',{cache:'no-store'}).then(function(r){ return r.ok?r.json():{budget:0,items:[]}; })
+    fetch('data/expenses.json',{cache:'no-store'}).then(function(r){ return r.ok?r.json():{budget:0,items:[]}; }),
+    fetch('data/quotes.json',{cache:'no-store'}).then(function(r){ return r.ok?r.json():{quotes:[]}; })
   ]).then(function(res){
     var d1 = res[0]||{}, d2 = res[1]||{};
     ENTRIES = (d1.entries||[]).slice().sort(function(a,b){ return a.date < b.date ? 1 : -1; });
     EXP = {budget: Number(d2.budget)||0, items: Array.isArray(d2.items)?d2.items:[]};
+    var d3 = res[2]||{};
+    QUOTES = Array.isArray(d3.quotes)?d3.quotes:[];
     buildTags();
     renderDiary();
     renderLedger();
+    renderQuotes();
     bind();
     switchView('diary');
   }).catch(function(err){
